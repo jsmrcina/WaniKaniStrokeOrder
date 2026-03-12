@@ -50,6 +50,8 @@
         '.stroke_order_loading--error {height: auto; overflow: visible; background: none; color: #d32f2f; font-size: 14px; display: flex; align-items: center; gap: 6px;}' +
         '.stroke_order_loading--error_bar {width: 40px; height: 4px; background: #d32f2f; border-radius: 2px; flex-shrink: 0;}' +
         '@keyframes stroke_order_slide {0% {transform: translateX(-100%);} 100% {transform: translateX(433%);}}'  +
+        '.item-info-injector-accordion > button {font-family: var(--font-family-default) !important; font-weight: var(--font-weight-regular) !important; text-shadow: none !important; letter-spacing: normal !important; line-height: 1 !important;}' +
+        '.item-info-injector > h2:not(.subject-section__meanings-title) {font-family: var(--font-family-default) !important; font-weight: var(--font-weight-regular) !important; text-shadow: none !important; letter-spacing: normal !important; line-height: 1 !important;}' +
         '.item-info-injector-accordion > button > i {font-style: normal !important; font-family: inherit !important; font-size: 0 !important; width: 18px !important; height: 18px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; color: inherit !important;}' +
         '.item-info-injector-accordion > button > i::before {content: "" !important; display: block !important; width: 8px !important; height: 8px !important; border: none !important; border-right: 2px solid currentColor !important; border-bottom: 2px solid currentColor !important; transform: rotate(-45deg) !important; font-family: inherit !important; margin-left: -2px !important;}'
 
