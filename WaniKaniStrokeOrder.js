@@ -1,20 +1,18 @@
 // ==UserScript==
 // @name        WaniKani All Stroke Order
 // @namespace   japanese
-// @version     1.1.22
+// @version     1.0.0
 // @description Shows a kanji's stroke order on its page and during lessons and reviews.
 // @license     GPL version 3 or any later version; http://www.gnu.org/copyleft/gpl.html
 // @match       https://www.wanikani.com/*
 // @match       https://preview.wanikani.com/*
-// @author      Looki, maintained by kind users on the forum
+// @author      Original script by: "Looki, maintained by kind users on the forum"; forked by jsmrcina. Hosted at: https://github.com/jsmrcina/WaniKaniStrokeOrder
 // @grant       GM_xmlhttpRequest
 // @connect     jisho.org
 // @connect     cloudfront.net
 // @require     https://cdnjs.cloudflare.com/ajax/libs/snap.svg/0.5.1/snap.svg-min.js
 // @require     https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1326536
 
-// @downloadURL https://update.greasyfork.org/scripts/414633/WaniKani%20Stroke%20Order.user.js
-// @updateURL https://update.greasyfork.org/scripts/414633/WaniKani%20Stroke%20Order.meta.js
 // ==/UserScript==
 
 /*
