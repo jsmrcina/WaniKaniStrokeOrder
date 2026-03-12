@@ -49,11 +49,7 @@
         '.stroke_order_loading--bar {height: 100%; width: 30%; background: #888; border-radius: 2px; animation: stroke_order_slide 1.5s ease-in-out infinite;}' +
         '.stroke_order_loading--error {height: auto; overflow: visible; background: none; color: #d32f2f; font-size: 14px; display: flex; align-items: center; gap: 6px;}' +
         '.stroke_order_loading--error_bar {width: 40px; height: 4px; background: #d32f2f; border-radius: 2px; flex-shrink: 0;}' +
-        '@keyframes stroke_order_slide {0% {transform: translateX(-100%);} 100% {transform: translateX(433%);}}'  +
-        '.item-info-injector-accordion > button {font-family: var(--font-family-default) !important; font-weight: var(--font-weight-regular) !important; text-shadow: none !important; letter-spacing: normal !important; line-height: 1 !important;}' +
-        '.item-info-injector > h2:not(.subject-section__meanings-title) {font-family: var(--font-family-default) !important; font-weight: var(--font-weight-regular) !important; text-shadow: none !important; letter-spacing: normal !important; line-height: 1 !important;}' +
-        '.item-info-injector-accordion > button > i {font-style: normal !important; font-family: inherit !important; font-size: 0 !important; width: 18px !important; height: 18px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; color: inherit !important;}' +
-        '.item-info-injector-accordion > button > i::before {content: "" !important; display: block !important; width: 8px !important; height: 8px !important; border: none !important; border-right: 2px solid currentColor !important; border-bottom: 2px solid currentColor !important; transform: rotate(-45deg) !important; font-family: inherit !important; margin-left: -2px !important;}'
+        '@keyframes stroke_order_slide {0% {transform: translateX(-100%);} 100% {transform: translateX(433%);}}'
 
     init()
 
@@ -61,26 +57,15 @@
      * Main
      */
     function init() {
+        // Lesson pages: use injector's append (creates simple h2, matches lesson structure)
         wkItemInfo.on('lesson').forType('kanji').under('composition').append('Stroke Order', loadDiagram)
-        wkItemInfo
-            .on('lessonQuiz, review, extraStudy, itemPage')
-            .forType('kanji')
-            .under('composition')
-            .appendAtTop('Stroke Order', loadDiagram)
-
         wkItemInfo.on('lesson').forType('vocabulary').under('composition').append('Stroke Order', loadVocabDiagrams)
-        wkItemInfo
-            .on('lessonQuiz, review, extraStudy, itemPage')
-            .forType('vocabulary')
-            .under('composition')
-            .appendAtTop('Stroke Order', loadVocabDiagrams)
-
         wkItemInfo.on('lesson').forType('radical').under('meaning').notify(loadRadicalNotify)
-        wkItemInfo
-            .on('lessonQuiz, review, extraStudy, itemPage')
-            .forType('radical')
-            .under('meaning')
-            .notify(loadRadicalNotify)
+
+        // Review/quiz/study/item pages: use notify with native WaniKani HTML structure
+        wkItemInfo.on('lessonQuiz, review, extraStudy, itemPage').forType('kanji').under('composition').notify(loadKanjiNative)
+        wkItemInfo.on('lessonQuiz, review, extraStudy, itemPage').forType('vocabulary').under('composition').notify(loadVocabNative)
+        wkItemInfo.on('lessonQuiz, review, extraStudy, itemPage').forType('radical').under('meaning').notify(loadRadicalNative)
 
         let style = document.createElement('style')
         style.textContent = strokeOrderCss
@@ -116,6 +101,34 @@
         let errorBar = document.createElement('div')
         errorBar.className = 'stroke_order_loading--error_bar'
         loadingEl.replaceChildren(errorBar, errorText)
+    }
+
+    let pendingWait = null
+
+    function waitForElement(selector) {
+        if (pendingWait) {
+            pendingWait.disconnect()
+            pendingWait = null
+        }
+        return new Promise(resolve => {
+            let fresh = selector + ':not([data-stroke-order-seen])'
+            let el = document.querySelector(fresh)
+            if (el) {
+                el.setAttribute('data-stroke-order-seen', '')
+                return resolve(el)
+            }
+            let observer = new MutationObserver(() => {
+                el = document.querySelector(fresh)
+                if (el) {
+                    el.setAttribute('data-stroke-order-seen', '')
+                    observer.disconnect()
+                    pendingWait = null
+                    resolve(el)
+                }
+            })
+            observer.observe(document.body, { childList: true, subtree: true })
+            pendingWait = observer
+        })
     }
 
     /*
@@ -155,8 +168,123 @@
     function loadRadicalNotify(injectorState) {
         if (!injectorState.characters || !isKanji(injectorState.characters)) return
         let loading = createLoadingBar()
-        let appendFn = injectorState.on === 'lesson' ? 'append' : 'appendAtTop'
-        injectorState.injector[appendFn]('Stroke Order', loading)
+        injectorState.injector.append('Stroke Order', loading)
+        fetchAndRenderStrokeOrder(injectorState.characters)
+            .then(diagram => {
+                if (diagram) loading.replaceWith(diagram)
+                else setLoadingError(loading, 'No stroke order data found')
+            })
+            .catch(e => setLoadingError(loading, String(e)))
+    }
+
+    /*
+     * Native WaniKani section creation for review/quiz/study/item pages.
+     * Creates HTML that matches WaniKani's own collapsible section structure
+     * so that WaniKani's CSS handles all styling automatically.
+     */
+    function createNativeSection(title, contentElement) {
+        let ns = 'http://www.w3.org/2000/svg'
+        let section = document.createElement('section')
+        section.className = 'subject-section subject-section--collapsible'
+
+        let h2 = document.createElement('h2')
+        h2.className = 'subject-section__title'
+
+        let toggle = document.createElement('a')
+        toggle.className = 'subject-section__toggle'
+        toggle.setAttribute('aria-expanded', 'true')
+
+        let iconSpan = document.createElement('span')
+        iconSpan.className = 'subject-section__toggle-icon'
+        let svg = document.createElementNS(ns, 'svg')
+        svg.classList.add('wk-icon', 'wk-icon--chevron_right')
+        svg.setAttribute('viewBox', '0 0 320 512')
+        svg.setAttribute('aria-hidden', 'true')
+        svg.style.width = '1em'
+        svg.style.height = '1em'
+        let use = document.createElementNS(ns, 'use')
+        use.setAttribute('href', '#wk-icon__chevron-right')
+        svg.append(use)
+        iconSpan.append(svg)
+
+        let textSpan = document.createElement('span')
+        textSpan.className = 'subject-section__title-text'
+        textSpan.textContent = title
+
+        toggle.append(iconSpan, textSpan)
+        h2.append(toggle)
+
+        let content = document.createElement('section')
+        content.className = 'subject-section__content'
+        content.append(contentElement)
+
+        section.setAttribute('expanded', '')
+        section.append(h2, content)
+
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault()
+            let expanded = toggle.getAttribute('aria-expanded') === 'true'
+            toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true')
+            content.hidden = expanded
+            if (expanded) section.removeAttribute('expanded')
+            else section.setAttribute('expanded', '')
+        })
+
+        return section
+    }
+
+    function loadKanjiNative(injectorState) {
+        let loading = createLoadingBar()
+        let section = createNativeSection('Stroke Order', loading)
+        waitForElement('.subject-section--meaning').then(target => target.before(section))
+
+        fetchAndRenderStrokeOrder(injectorState.characters)
+            .then(diagram => {
+                if (diagram) loading.replaceWith(diagram)
+                else setLoadingError(loading, 'No stroke order data found')
+            })
+            .catch(e => setLoadingError(loading, String(e)))
+    }
+
+    function loadVocabNative(injectorState) {
+        let kanjiChars = (injectorState.composition || [])
+            .map(k => k.characters)
+            .filter(c => c && isKanji(c))
+        if (kanjiChars.length === 0) return
+
+        let container = document.createElement('div')
+        let entries = kanjiChars.map(char => {
+            let label = document.createElement('h3')
+            label.textContent = char
+            label.style.cssText = 'margin: 0.5em 0 0.25em 0; font-size: 1.2em;'
+            let loading = createLoadingBar()
+            container.append(label, loading)
+            return { char, label, loading }
+        })
+
+        let section = createNativeSection('Stroke Order', container)
+        waitForElement('.subject-section--meaning').then(target => target.before(section))
+
+        ;(async () => {
+            for (let entry of entries) {
+                try {
+                    let diagram = await fetchAndRenderStrokeOrder(entry.char)
+                    if (diagram) entry.loading.replaceWith(diagram)
+                    else setLoadingError(entry.loading, 'No stroke order data found')
+                } catch (e) {
+                    setLoadingError(entry.loading, String(e))
+                }
+            }
+        })()
+    }
+
+    function loadRadicalNative(injectorState) {
+        if (!injectorState.characters || !isKanji(injectorState.characters)) return
+
+        let loading = createLoadingBar()
+        let section = createNativeSection('Stroke Order', loading)
+        waitForElement('.subject-section--meaning').then(target => target.before(section))
+
         fetchAndRenderStrokeOrder(injectorState.characters)
             .then(diagram => {
                 if (diagram) loading.replaceWith(diagram)
