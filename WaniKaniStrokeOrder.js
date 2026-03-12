@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        WaniKani Stroke Order
+// @name        WaniKani All Stroke Order
 // @namespace   japanese
 // @version     1.1.22
 // @description Shows a kanji's stroke order on its page and during lessons and reviews.
@@ -44,7 +44,14 @@
         '.stroke_order_diagram--existing_path {fill: none; stroke: #aaa; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;}' +
         '.stroke_order_diagram--current_path {fill: none; stroke: #000; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;}' +
         '.stroke_order_diagram--path_start {fill: rgba(255,0,0,0.7); stroke: none;}' +
-        '.stroke_order_diagram--guide_line {fill: none; stroke: #ddd; stroke-width: 2; stroke-linecap: square; stroke-linejoin: square; stroke-dasharray: 5, 5;}'
+        '.stroke_order_diagram--guide_line {fill: none; stroke: #ddd; stroke-width: 2; stroke-linecap: square; stroke-linejoin: square; stroke-dasharray: 5, 5;}' +
+        '.stroke_order_loading {height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin: 8px 0;}' +
+        '.stroke_order_loading--bar {height: 100%; width: 30%; background: #888; border-radius: 2px; animation: stroke_order_slide 1.5s ease-in-out infinite;}' +
+        '.stroke_order_loading--error {height: auto; overflow: visible; background: none; color: #d32f2f; font-size: 14px; display: flex; align-items: center; gap: 6px;}' +
+        '.stroke_order_loading--error_bar {width: 40px; height: 4px; background: #d32f2f; border-radius: 2px; flex-shrink: 0;}' +
+        '@keyframes stroke_order_slide {0% {transform: translateX(-100%);} 100% {transform: translateX(433%);}}'  +
+        '.item-info-injector-accordion > button > i {font-style: normal !important; font-family: inherit !important; font-size: 0 !important; width: 18px !important; height: 18px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; color: inherit !important;}' +
+        '.item-info-injector-accordion > button > i::before {content: "" !important; display: block !important; width: 8px !important; height: 8px !important; border: none !important; border-right: 2px solid currentColor !important; border-bottom: 2px solid currentColor !important; transform: rotate(-45deg) !important; font-family: inherit !important; margin-left: -2px !important;}'
 
     init()
 
@@ -58,6 +65,20 @@
             .forType('kanji')
             .under('composition')
             .appendAtTop('Stroke Order', loadDiagram)
+
+        wkItemInfo.on('lesson').forType('vocabulary').under('composition').append('Stroke Order', loadVocabDiagrams)
+        wkItemInfo
+            .on('lessonQuiz, review, extraStudy, itemPage')
+            .forType('vocabulary')
+            .under('composition')
+            .appendAtTop('Stroke Order', loadVocabDiagrams)
+
+        wkItemInfo.on('lesson').forType('radical').under('meaning').notify(loadRadicalNotify)
+        wkItemInfo
+            .on('lessonQuiz, review, extraStudy, itemPage')
+            .forType('radical')
+            .under('meaning')
+            .notify(loadRadicalNotify)
 
         let style = document.createElement('style')
         style.textContent = strokeOrderCss
@@ -79,11 +100,27 @@
         )
     }
 
+    function createLoadingBar() {
+        let wrapper = document.createElement('div')
+        wrapper.className = 'stroke_order_loading'
+        let bar = document.createElement('div')
+        bar.className = 'stroke_order_loading--bar'
+        wrapper.append(bar)
+        return wrapper
+    }
+
+    function setLoadingError(loadingEl, errorText) {
+        loadingEl.className = 'stroke_order_loading stroke_order_loading--error'
+        let errorBar = document.createElement('div')
+        errorBar.className = 'stroke_order_loading--error_bar'
+        loadingEl.replaceChildren(errorBar, errorText)
+    }
+
     /*
      * Adds the diagram section element to the appropriate location
      */
-    async function loadDiagram(injectorState) {
-        let xhr = await xmlHttpRequest(JISHO + '/search/' + encodeURI(injectorState.characters) + '%20%23kanji')
+    async function fetchAndRenderStrokeOrder(character) {
+        let xhr = await xmlHttpRequest(JISHO + '/search/' + encodeURI(character) + '%20%23kanji')
 
         let strokeOrderSvg = xhr.responseText.match(/var url = '\/\/(.+)';/)
         if (!strokeOrderSvg) return null
@@ -93,7 +130,6 @@
         let namespace = 'http://www.w3.org/2000/svg'
         let div = document.createElement('div')
         let svg = document.createElementNS(namespace, 'svg')
-        svg.id = 'stroke_order'
         div.style = 'width: 100%; overflow: auto hidden;'
         new strokeOrderDiagram(
             svg,
@@ -101,6 +137,67 @@
         )
         div.append(svg)
         return div
+    }
+
+    function loadDiagram(injectorState) {
+        let loading = createLoadingBar()
+        fetchAndRenderStrokeOrder(injectorState.characters)
+            .then(diagram => {
+                if (diagram) loading.replaceWith(diagram)
+                else setLoadingError(loading, 'No stroke order data found')
+            })
+            .catch(e => setLoadingError(loading, String(e)))
+        return loading
+    }
+
+    function loadRadicalNotify(injectorState) {
+        if (!injectorState.characters || !isKanji(injectorState.characters)) return
+        let loading = createLoadingBar()
+        let appendFn = injectorState.on === 'lesson' ? 'append' : 'appendAtTop'
+        injectorState.injector[appendFn]('Stroke Order', loading)
+        fetchAndRenderStrokeOrder(injectorState.characters)
+            .then(diagram => {
+                if (diagram) loading.replaceWith(diagram)
+                else setLoadingError(loading, 'No stroke order data found')
+            })
+            .catch(e => setLoadingError(loading, String(e)))
+    }
+
+    function isKanji(char) {
+        let code = char.charCodeAt(0)
+        return (code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)
+    }
+
+    function loadVocabDiagrams(injectorState) {
+        let kanjiChars = (injectorState.composition || [])
+            .map(k => k.characters)
+            .filter(c => c && isKanji(c))
+
+        if (kanjiChars.length === 0) return null
+
+        let container = document.createElement('div')
+        let entries = kanjiChars.map(char => {
+            let label = document.createElement('h3')
+            label.textContent = char
+            label.style.cssText = 'margin: 0.5em 0 0.25em 0; font-size: 1.2em;'
+            let loading = createLoadingBar()
+            container.append(label, loading)
+            return { char, label, loading }
+        })
+
+        ;(async () => {
+            for (let entry of entries) {
+                try {
+                    let diagram = await fetchAndRenderStrokeOrder(entry.char)
+                    if (diagram) entry.loading.replaceWith(diagram)
+                    else setLoadingError(entry.loading, 'No stroke order data found')
+                } catch (e) {
+                    setLoadingError(entry.loading, String(e))
+                }
+            }
+        })()
+
+        return container
     }
 
     /*
