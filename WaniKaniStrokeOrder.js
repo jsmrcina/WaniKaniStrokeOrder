@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        WaniKani All Stroke Order
 // @namespace   japanese
-// @version     1.0.0
+// @version     1.0.1
 // @description Shows a kanji's stroke order on its page and during lessons and reviews.
 // @license     GPL version 3 or any later version; http://www.gnu.org/copyleft/gpl.html
 // @match       https://www.wanikani.com/*
