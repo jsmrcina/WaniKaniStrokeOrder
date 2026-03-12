@@ -13,6 +13,9 @@
 // @require     https://cdnjs.cloudflare.com/ajax/libs/snap.svg/0.5.1/snap.svg-min.js
 // @require     https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1326536
 
+// @downloadURL https://update.greasyfork.org/scripts/569444/WaniKani%20All%20Stroke%20Order.user.js
+// @updateURL https://update.greasyfork.org/scripts/569444/WaniKani%20All%20Stroke%20Order.meta.js
+
 // ==/UserScript==
 
 /*
